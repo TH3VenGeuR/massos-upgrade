@@ -154,10 +154,23 @@ fi
 echo "Done!"
 cd $wdir
 # Detect and run any extra commands necessary after the upgrade.
-if [ -e massos-upgrade/tmp/preupgrade ]; then
-  echo "Running additional pre-upgrade steps... "
-  . massos-upgrade/tmp/preupgrade
+if [ "$(ldd --version | head -n1 | cut -d' ' -f4)" != "2.36" ]; then
+  reqreboot="yes"
+  echo "there is a glibc update, your computer will reboot at the end of the process"
+  echo ""
+  read -p "would you like to continue? [y/N] " stillupg
+  stillupg="${stillupg:0:1}"
+  stillupg=$(echo "$stillupg" | tr '[:upper:]' '[:lower:]')
+  if [ "$stillupg" != "y" ]; then
+    exit 1
+  fi
+else 
+  reqreboot="no"
 fi
+#if [ -e massos-upgrade/tmp/preupgrade ]; then
+#  echo "Running additional pre-upgrade steps... "
+#  . massos-upgrade/tmp/preupgrade
+#fi
 printf "Checking for configuration file conflicts... "
 for i in $(find massos-upgrade/etc -type f); do
   newfile="$i"
@@ -232,9 +245,6 @@ echo "Done!"
 printf "Installing new headers to /usr/include... "
 cp -af massos-upgrade/usr/include /usr
 echo "Done!"
-printf "Installing new data files to /usr/share... "
-cp -af massos-upgrade/usr/share /usr
-echo "Done!"
 # More forwards compatibility.
 if [ "$(ls -A massos-upgrade/usr/src)" ]; then
   printf "Installing new files to /usr/src... "
@@ -280,6 +290,9 @@ while read -r line; do
 done < libs.txt
 ldconfig
 echo "Done!"
+printf "Installing new data files to /usr/share... "
+cp -af massos-upgrade/usr/share /usr
+echo "Done!"
 # Fix /usr/src/linux symlink.
 KVER=$(find massos-upgrade/boot -name vmlinuz-* | sed 's/massos-upgrade\/boot\/vmlinuz-//')
 if [ -L /usr/src/linux ]; then
@@ -305,4 +318,8 @@ fi
 printf "Removing temporary upgrade files... "
 rm -rf $wdir
 echo "Done!"
-echo -e "\nMassOS has successfully been upgraded. You must now REBOOT."
+if [ $reqreboot == "yes" ]; then
+  reboot
+elif [ $reqreboot == "no" ]; then
+  echo -e "\nMassOS has successfully been upgraded. You must now REBOOT."
+fi 
